@@ -1,0 +1,25 @@
+
+syntax = "proto3";
+
+option go_package = "pkg/grpc";
+
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+
+package tandem;
+
+service TandemService {
+  rpc GetData(google.protobuf.Empty) returns (stream GetDataResponse);
+  rpc SendData(stream SendDataRequest) returns (google.protobuf.Empty);
+}
+
+
+message GetDataResponse {
+  bytes message = 1;
+  google.protobuf.Timestamp timestamp = 2;
+}
+
+message SendDataRequest {
+  bytes message = 1;
+  google.protobuf.Timestamp timestamp = 2;
+}
