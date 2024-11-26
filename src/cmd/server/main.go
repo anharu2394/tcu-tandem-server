@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"io"
 	"log"
 	"net"
@@ -17,12 +16,20 @@ import (
 
 func main() {
 	// 1. 8080番portのListenerを作成
-	port := 8080
-	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+		log.Printf("Defaulting to port %s", port)
+	}
+	listener, err := net.Listen("tcp", ":"+port)
 	if err != nil {
 		panic(err)
 	}
-
+	/**
+	cred, err := credentials.NewServerTLSFromFile("service.pem", "service.key")
+	if err != nil {
+		panic(err)
+	}*/
 	// 2. gRPCサーバーを作成
 	s := grpc.NewServer()
 
@@ -31,7 +38,9 @@ func main() {
 	reflection.Register(s)
 	go func() {
 		log.Printf("start gRPC server port: %v", port)
-		s.Serve(listener)
+		if err = s.Serve(listener); err != nil {
+			log.Fatalf("failed to serve: %v", err)
+		}
 	}()
 
 	// 4.Ctrl+Cが入力されたらGraceful shutdownされるようにする

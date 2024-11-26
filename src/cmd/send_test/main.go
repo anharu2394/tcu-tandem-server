@@ -13,9 +13,11 @@ import (
     timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	"tandem-data-server/pkg/tcp"
 	"time"
+	"crypto/tls"
 
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
+
+	"google.golang.org/grpc/credentials"
 )
 
 var (
@@ -126,15 +128,23 @@ func main() {
     ifTcp(1 * time.Second)
 }
 
+func NewConn(host string, insecure bool) (*grpc.ClientConn, error) {
+	var opts []grpc.DialOption
+
+	if insecure {
+		opts = append(opts, grpc.WithInsecure())
+	} else {
+		tlsCredentials :=  grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{}))
+		opts = append(opts, tlsCredentials)
+        opts = append(opts, grpc.WithBlock())
+	}
+
+	return grpc.Dial(host, opts...)
+}
 // TCP/IP Connection Handler
 func ifTcp(timeout time.Duration) {
-	address := "127.0.0.1:8080"
-	conn, err := grpc.Dial(
-		address,
-
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithBlock(),
-	)
+	address := "tandem-grpc-server-hipd7dwdba-an.a.run.app:443"
+	conn, err := NewConn(address, false)
 	if err != nil {
 		log.Fatal("Connection failed.")
 		return
@@ -144,8 +154,8 @@ func ifTcp(timeout time.Duration) {
 	// 3. gRPCクライアントを生成
 	client = tandempb.NewTandemServiceClient(conn)
 
-    ip := "127.0.0.1"
-    port := 8080
+    ip := "tandem-grpc-server-hipd7dwdba-an.a.run.app"
+    port := 443
     tcp := tcp.NewTcp(timeout)
     if !tcp.Open(ip, port) {
         fmt.Println("Connection error")
@@ -201,6 +211,7 @@ func binaryMode(tcp *tcp.Tcp) {
             data, _ := tcp.ReadBinary(length)
             err := stream.Send(&tandempb.SendDataRequest{Message: data, Timestamp: timestamppb.New(time.Now())})
             if err != nil {
+                fmt.Println("Send error")
                 fmt.Println(err)
             }
             fmt.Println("Data:", data)
