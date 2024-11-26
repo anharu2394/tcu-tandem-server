@@ -17,54 +17,70 @@ import time
 import grpc
 import tandem_pb2
 import tandem_pb2_grpc
+import asyncio
 from google.protobuf import empty_pb2 as google_dot_protobuf_dot_empty__pb2
 from google.protobuf import timestamp_pb2 as _timestamp_pb2
 
 #Timeout(1sec)
 Timeout_default = 1
 
-def main():
-    if_usb()
+async def main():
+    await if_usb()
 # USB Connection
-def if_usb():
+async def if_usb():
 
-    print("USB ID of the device?")
-    ID = int(input())
+
+    ID = 0
 
     usb = Usb(Timeout_default)
     if not usb.open(ID):
         print("Connection error")
         return
 
-    binary_mode(usb)
+    await binary_mode(usb)
 
     usb.close()
 
 # Binary mode
 async def binary_mode(obj):
-    async with grpc.aio.insecure_channel("tandem-grpc-server-hipd7dwdba-an.a.run.app:443") as channel:
-        stub = tandem_pb2_grpc.TandemStub(channel)
+    credentials = grpc.ssl_channel_credentials()
+    async with grpc.aio.secure_channel("tandem-grpc-server-hipd7dwdba-an.a.run.app:443",credentials) as channel:
+        stub = tandem_pb2_grpc.TandemServiceStub(channel)
         #Send and receive commands
-        stream = stub.SendData(google_dot_protobuf_dot_empty__pb2.Empty())
+        response = await stub.SendData(binary_generator(obj))
+        print(response)
+
+async def binary_generator(obj):
+    try:
         while True:
             command = ":MEAS:OUTP:ONE?"
             
             # Send command
-            obj.send_command(command)
+            if not obj.send_command(command):
+                print("コマンド送信エラー")
+                break
 
-            #If the command contains "?"
-            msgbuf = obj.read_binary(8, Timeout_default)    # Read header
-            print(msgbuf.decode())
-            len = int(msgbuf[2:8].decode('utf-8'))          # Read binary byte length
-            print("Len " + str(len))
-            msgbuf2 = obj.read_binary(len, Timeout_default) # Read data
-            print(msgbuf2, type(msgbuf2))
-            timestamp = _timestamp_pb2.Timestamp(seconds=int(time.time()))
-            request = tandem_pb2.SendDataRequest(message=msgbuf2, timestamp=timestamp)
-            stream.write(request)
-            #Send only
-            time.sleep(1)
-
+            try:
+                msgbuf = bytes(obj.read_binary(8, Timeout_default))
+                if not msgbuf:
+                    print("ヘッダー読み取りエラー")
+                    break
+                    
+                length = int(msgbuf[2:8].decode('utf-8'))
+                msgbuf2 = obj.read_binary(length, Timeout_default)
+                
+                timestamp = _timestamp_pb2.Timestamp(seconds=int(time.time()))
+                yield tandem_pb2.SendDataRequest(message=bytes(msgbuf2), timestamp=timestamp)
+                
+                await asyncio.sleep(1)
+                
+            except Exception as e:
+                print(f"データ読み取りエラー: {e}")
+                break
+                
+    except Exception as e:
+        print(f"予期せぬエラー: {e}")
+        raise
 
 if __name__ == '__main__':
-  main()
+  asyncio.run(main())
