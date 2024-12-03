@@ -33,7 +33,7 @@ func main() {
 	// 2. gRPCサーバーを作成
 	s := grpc.NewServer()
 
-	tandempb.RegisterTandemServiceServer(s, &tandemServer{})
+	tandempb.RegisterTandemServiceServer(s, &tandemServer{isStreamStarted: false})
 
 	reflection.Register(s)
 	go func() {
@@ -53,34 +53,34 @@ func main() {
 
 type tandemServer struct {
 	tandempb.UnimplementedTandemServiceServer
-	prevSendDataRequest *tandempb.SendDataRequest
 	currentSendDataRequest *tandempb.SendDataRequest
+	isStreamStarted bool
 }
 
 func (s *tandemServer) GetData(_ *emptypb.Empty,stream tandempb.TandemService_GetDataServer) error {
 	for {
-		prevTimestamp := s.prevSendDataRequest.GetTimestamp()
-		currentTimestamp := s.currentSendDataRequest.GetTimestamp()
-		if prevTimestamp != currentTimestamp {
-			if err := stream.Send(&tandempb.GetDataResponse{Message: s.currentSendDataRequest.GetMessage()}); err != nil {
+		if s.isStreamStarted {
+			if err := stream.Send(&tandempb.GetDataResponse{Message: s.currentSendDataRequest.GetMessage(), Timestamp: s.currentSendDataRequest.GetTimestamp()}); err != nil {
 				log.Printf("Failed to send message: %v", err)
 				return err
 			}
 		}
-		s.prevSendDataRequest = s.currentSendDataRequest
-		time.Sleep(1000 * time.Millisecond)
+		time.Sleep(500 * time.Millisecond)
 	}
 }
 
 func (s *tandemServer) SendData(stream tandempb.TandemService_SendDataServer) error {
+	s.isStreamStarted = true
 	for {
 		req, err := stream.Recv()
 		if err != nil {
 			if err == io.EOF {
 				log.Printf("Client disconnected")
-				return nil
+				s.isStreamStarted = false
+				return err
 			}
 			log.Printf("Failed to receive message: %v", err)
+			s.isStreamStarted = false
 			return err
 		}
 		s.currentSendDataRequest = req
