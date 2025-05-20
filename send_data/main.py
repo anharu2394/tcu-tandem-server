@@ -21,7 +21,7 @@ supabase: Client = create_client(url, key)
 grpc_address = "tandem-grpc-server-hipd7dwdba-an.a.run.app:443"
 
 # GBD path
-gbd_path = r"C:\Users\TCU-Tandem\Documents\graphtec\GL100_240_840-APS\Data\2024-12-10\2025-05-20\GL240_01_2025-05-20_11-56-13.gbd"
+gbd_path = r"C:\\Users\\TCU-Tandem\\Documents\\graphtec\\GL100_240_840-APS\\Data\\2024-12-10\\2025-05-20\\GL240_01_2025-05-20_11-56-13.gbd"
 
 def read_gbd_file(file_path):
     header_size = 9216
@@ -39,7 +39,7 @@ def read_gbd_file(file_path):
     analog_data_raw = data[:, :10]
     analog_data = analog_data_raw / 200.0
 
-    time = np.arange(num_records) * 0.1
+    time_sec = np.arange(num_records) * 0.1
     channel_names = [
         "入射ファラデ電流",
         "加速後の電流",
@@ -53,7 +53,7 @@ def read_gbd_file(file_path):
         "プローブポジション"
     ]
     df = pd.DataFrame(analog_data, columns=channel_names)
-    df.insert(0, "Time(s)", time)
+    df.insert(0, "Time(s)", time_sec)
     return df
 
 def process_gbd():
@@ -72,39 +72,72 @@ async def send_to_grpc_forever():
             last_row_count = 0
             while True:
                 total_rows, df = process_gbd()
-                
+
                 if total_rows > last_row_count:
                     print(f"GBDファイルが更新されました。総行数: {total_rows} (前回: {last_row_count})")
                     for _, row in df.iterrows():
                         timestamp = datetime.utcnow()
-                        timestamp_iso = timestamp.isoformat()
-                        existing = supabase.table("tandem_data").select("id").eq("timestamp", timestamp_iso).execute()
-                        if not existing.data:
-                            supabase.table("tandem_data").insert({
-                                "id": str(uuid.uuid4()),
-                                "timestamp": timestamp_iso,
-                                "beam_current_in": row["入射ファラデ電流"],
-                                "beam_current_out": row["加速後の電流"],
-                                "charge_current": row["Charge Current"],
-                                "gvm": row["GVM"],
-                                "charge_power_supply": row["Charge Power Supply"],
-                                "le": row["LE"],
-                                "he": row["HE"],
-                                "cpo": row["C.P.O"],
-                                "probe_current": row["プローブカレント"],
-                                "probe_position": row["プローブポジション"]
-                            }).execute()
+                        timestamp_proto = _timestamp_pb2.Timestamp()
+                        timestamp_proto.FromDatetime(timestamp)
+
+                        beam_current_in = row["入射ファラデ電流"]
+                        beam_current_out = row["加速後の電流"]
+                        charge_current = row["Charge Current"]
+                        charge_power_supply = row["Charge Power Supply"]
+                        gvm_value = float(row["GVM"])
+                        le = row["LE"]
+                        he = row["HE"]
+
+                        tandem_data = tandem_pb2.TandemData(
+                            id=str(uuid.uuid4()),
+                            timestamp=timestamp_proto,
+                            beam_current_in=beam_current_in,
+                            beam_current_out=beam_current_out,
+                            charge_current=charge_current,
+                            gvm=str(gvm_value),
+                            charge_power_supply=charge_power_supply,
+                            le=le,
+                            he=he,
+                            cpo=row["C.P.O"],
+                            probe_current=row["プローブカレント"],
+                            probe_position=row["プローブポジション"],
+                            experiment_id="",
+
+                            # ダミー値または後で計算追加
+                            transmission_ratio=beam_current_out / beam_current_in if beam_current_in != 0 else 0,
+                            transmission_slope=0,
+                            transmission_variance=0,
+                            beam_loss_ratio=he / le if le != 0 else 0,
+                            gvm_charge_correlation=0,
+                            charge_current_slope=0,
+                            charge_current_variance=0,
+                            gvm_slope=0,
+                            gvm_variance=0,
+                            stability_score=0.0
+                        )
+
+                        print("送信データ:", tandem_data)
+                        yield tandem_data
+
+                        supabase.table("tandem_data").insert({
+                            "id": tandem_data.id,
+                            "timestamp": timestamp.isoformat(),
+                            "beam_current_in": beam_current_in,
+                            "beam_current_out": beam_current_out,
+                            "charge_current": charge_current,
+                            "gvm": str(gvm_value),
+                            "charge_power_supply": charge_power_supply,
+                            "le": le,
+                            "he": he,
+                            "cpo": tandem_data.cpo,
+                            "probe_current": tandem_data.probe_current,
+                            "probe_position": tandem_data.probe_position
+                        }).execute()
+
                     last_row_count = total_rows
                 else:
                     print(f"GBDファイルは更新されていません。現在の総行数: {total_rows}")
 
-                if not df.empty:
-                    latest_row = df.iloc[-1]
-                    ts = _timestamp_pb2.Timestamp()
-                    ts.FromDatetime(datetime.utcnow())
-                    float_values = latest_row[1:].astype('float32').values.tobytes()
-                    print("送信データ:", float_values)
-                    yield tandem_pb2.SendDataRequest(message=float_values, timestamp=ts)
                 await asyncio.sleep(1)
 
         try:

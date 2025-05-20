@@ -6,7 +6,7 @@ import warnings
 from google.protobuf import empty_pb2 as google_dot_protobuf_dot_empty__pb2
 import tandem_pb2 as tandem__pb2
 
-GRPC_GENERATED_VERSION = '1.67.1'
+GRPC_GENERATED_VERSION = '1.71.0'
 GRPC_VERSION = grpc.__version__
 _version_not_supported = False
 
@@ -38,11 +38,11 @@ class TandemServiceStub(object):
         self.GetData = channel.unary_stream(
                 '/tandem.TandemService/GetData',
                 request_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
-                response_deserializer=tandem__pb2.GetDataResponse.FromString,
+                response_deserializer=tandem__pb2.TandemData.FromString,
                 _registered_method=True)
         self.SendData = channel.stream_unary(
                 '/tandem.TandemService/SendData',
-                request_serializer=tandem__pb2.SendDataRequest.SerializeToString,
+                request_serializer=tandem__pb2.TandemData.SerializeToString,
                 response_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
                 _registered_method=True)
 
@@ -68,11 +68,11 @@ def add_TandemServiceServicer_to_server(servicer, server):
             'GetData': grpc.unary_stream_rpc_method_handler(
                     servicer.GetData,
                     request_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
-                    response_serializer=tandem__pb2.GetDataResponse.SerializeToString,
+                    response_serializer=tandem__pb2.TandemData.SerializeToString,
             ),
             'SendData': grpc.stream_unary_rpc_method_handler(
                     servicer.SendData,
-                    request_deserializer=tandem__pb2.SendDataRequest.FromString,
+                    request_deserializer=tandem__pb2.TandemData.FromString,
                     response_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
             ),
     }
@@ -102,7 +102,7 @@ class TandemService(object):
             target,
             '/tandem.TandemService/GetData',
             google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
-            tandem__pb2.GetDataResponse.FromString,
+            tandem__pb2.TandemData.FromString,
             options,
             channel_credentials,
             insecure,
@@ -128,7 +128,7 @@ class TandemService(object):
             request_iterator,
             target,
             '/tandem.TandemService/SendData',
-            tandem__pb2.SendDataRequest.SerializeToString,
+            tandem__pb2.TandemData.SerializeToString,
             google_dot_protobuf_dot_empty__pb2.Empty.FromString,
             options,
             channel_credentials,
