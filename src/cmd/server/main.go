@@ -53,14 +53,14 @@ func main() {
 
 type tandemServer struct {
 	tandempb.UnimplementedTandemServiceServer
-	currentSendDataRequest *tandempb.SendDataRequest
+	currentSendDataRequest *tandempb.TandemData
 	isStreamStarted bool
 }
 
 func (s *tandemServer) GetData(_ *emptypb.Empty,stream tandempb.TandemService_GetDataServer) error {
 	for {
 		if s.isStreamStarted {
-			if err := stream.Send(&tandempb.GetDataResponse{Message: s.currentSendDataRequest.GetMessage(), Timestamp: s.currentSendDataRequest.GetTimestamp()}); err != nil {
+			if err := stream.Send(s.currentSendDataRequest); err != nil {
 				log.Printf("Failed to send message: %v", err)
 				return err
 			}
@@ -71,16 +71,19 @@ func (s *tandemServer) GetData(_ *emptypb.Empty,stream tandempb.TandemService_Ge
 
 func (s *tandemServer) SendData(stream tandempb.TandemService_SendDataServer) error {
 	s.isStreamStarted = true
+	defer func() {
+		s.isStreamStarted = false
+		log.Printf("Stream ended")
+	}()
+	
 	for {
 		req, err := stream.Recv()
 		if err != nil {
 			if err == io.EOF {
-				log.Printf("Client disconnected")
-				s.isStreamStarted = false
-				return err
+				log.Printf("Client disconnected normally")
+				return nil
 			}
 			log.Printf("Failed to receive message: %v", err)
-			s.isStreamStarted = false
 			return err
 		}
 		s.currentSendDataRequest = req

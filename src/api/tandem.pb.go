@@ -298,8 +298,7 @@ const file_tandem_proto_rawDesc = "" +
 	"\x0fstability_score\x18\x19 \x01(\x01R\x0estabilityScore2\x82\x01\n" +
 	"\rTandemService\x127\n" +
 	"\aGetData\x12\x16.google.protobuf.Empty\x1a\x12.tandem.TandemData0\x01\x128\n" +
-	"\bSendData\x12\x12.tandem.TandemData\x1a\x16.google.protobuf.Empty(\x01B\n" +
-	"Z\bpkg/grpcb\x06proto3"
+	"\bSendData\x12\x12.tandem.TandemData\x1a\x16.google.protobuf.Empty(\x01B\x1dZ\x1btandem-data-server/pkg/grpcb\x06proto3"
 
 var (
 	file_tandem_proto_rawDescOnce sync.Once
