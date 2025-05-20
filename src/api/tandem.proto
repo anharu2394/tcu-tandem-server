@@ -1,4 +1,3 @@
-
 syntax = "proto3";
 
 option go_package = "pkg/grpc";
@@ -9,17 +8,23 @@ import "google/protobuf/timestamp.proto";
 package tandem;
 
 service TandemService {
-  rpc GetData(google.protobuf.Empty) returns (stream GetDataResponse);
-  rpc SendData(stream SendDataRequest) returns (google.protobuf.Empty);
+  rpc GetData(google.protobuf.Empty) returns (stream TandemData);
+  rpc SendData(stream TandemData) returns (google.protobuf.Empty);
 }
 
-
-message GetDataResponse {
-  bytes message = 1;
+message TandemData {
+  string id = 1;
   google.protobuf.Timestamp timestamp = 2;
-}
-
-message SendDataRequest {
-  bytes message = 1;
-  google.protobuf.Timestamp timestamp = 2;
+  double beam_current_in = 3;
+  double beam_current_out = 4;
+  double charge_current = 5;
+  string gvm = 6;
+  double charge_power_supply = 7;
+  double le = 8;
+  double he = 9;
+  double cpo = 10;
+  double probe_current = 11;
+  double probe_position = 12;
+  string experiment_id = 13; // optional
+  
 }
