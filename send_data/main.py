@@ -21,7 +21,7 @@ supabase: Client = create_client(url, key)
 grpc_address = "tandem-grpc-server-hipd7dwdba-an.a.run.app:443"
 
 # GBD path
-gbd_path = "../gbd/GL240 01 Mar 26 2025.gbd"
+gbd_path = r"C:\Users\TCU-Tandem\Documents\graphtec\GL100_240_840-APS\Data\2024-12-10\2025-05-20\GL240_01_2025-05-20_11-56-13.gbd"
 
 def read_gbd_file(file_path):
     header_size = 9216
@@ -58,7 +58,10 @@ def read_gbd_file(file_path):
 
 def process_gbd():
     df = read_gbd_file(gbd_path)
-    return df.iloc[-30:]
+    total_rows = len(df)
+    print("GBDファイルの総行数:", total_rows)
+    print("最新の20行を返します")
+    return total_rows, df.iloc[-20:]
 
 async def send_to_grpc_forever():
     credentials = grpc.ssl_channel_credentials()
@@ -68,10 +71,10 @@ async def send_to_grpc_forever():
         async def generate_requests():
             last_row_count = 0
             while True:
-                df = process_gbd()
-
-                if len(df) != last_row_count:
-                    print("GBDファイルが更新されました。")
+                total_rows, df = process_gbd()
+                
+                if total_rows > last_row_count:
+                    print(f"GBDファイルが更新されました。総行数: {total_rows} (前回: {last_row_count})")
                     for _, row in df.iterrows():
                         timestamp = datetime.utcnow()
                         timestamp_iso = timestamp.isoformat()
@@ -91,7 +94,9 @@ async def send_to_grpc_forever():
                                 "probe_current": row["プローブカレント"],
                                 "probe_position": row["プローブポジション"]
                             }).execute()
-                    last_row_count = len(df)
+                    last_row_count = total_rows
+                else:
+                    print(f"GBDファイルは更新されていません。現在の総行数: {total_rows}")
 
                 if not df.empty:
                     latest_row = df.iloc[-1]

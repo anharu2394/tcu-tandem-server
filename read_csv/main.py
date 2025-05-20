@@ -19,7 +19,7 @@ supabase: Client = create_client(url, key)
 grpc_address = "tandem-grpc-server-hipd7dwdba-an.a.run.app:443"
 
 # CSV path
-csv_path = "../gbd/GL240 01 May 16 2023 (1).csv"
+csv_path = "csv.csv"
 
 # Combine Time and ms into ISO timestamp
 def parse_timestamp(row):

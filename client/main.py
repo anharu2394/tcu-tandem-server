@@ -68,6 +68,7 @@ async def binary_generator(obj):
                     
                 length = int(msgbuf[2:8].decode('utf-8'))
                 msgbuf2 = obj.read_binary(length, Timeout_default)
+                print("データを送る {}", bytes(msgbuf2))
                 
                 timestamp = _timestamp_pb2.Timestamp(seconds=int(time.time()))
                 yield tandem_pb2.SendDataRequest(message=bytes(msgbuf2), timestamp=timestamp)
