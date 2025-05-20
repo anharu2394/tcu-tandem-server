@@ -2,7 +2,7 @@ import pandas as pd
 import time
 import asyncio
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from supabase import create_client, Client
 import tandem_pb2
 import tandem_pb2_grpc
@@ -20,10 +20,43 @@ supabase: Client = create_client(url, key)
 # gRPC setup
 grpc_address = "tandem-grpc-server-hipd7dwdba-an.a.run.app:443"
 
-# GBD path
-gbd_path = r"C:\\Users\\TCU-Tandem\\Documents\\graphtec\\GL100_240_840-APS\\Data\\2024-12-10\\2025-05-20\\GL240_01_2025-05-20_11-56-13.gbd"
+def get_gbd_path():
+    today = datetime.now()
+    # 日付フォーマット: YYYY-MM-DD
+    date_str = today.strftime("%Y-%m-%d")
+    base_path = r"C:\Users\TCU-Tandem\Documents\graphtec\GL100_240_840-APS\Data\2024-12-10"
+    
+    # 今日の日付フォルダのパスを作成
+    date_path = os.path.join(base_path, date_str)
+    
+    # フォルダが存在しない場合は作成
+    if not os.path.exists(date_path):
+        os.makedirs(date_path)
+        print(f"新しいフォルダを作成しました: {date_path}")
+        return None
+    
+    # フォルダ内のGBDファイルを検索
+    gbd_files = [f for f in os.listdir(date_path) if f.endswith('.gbd')]
+    
+    if not gbd_files:
+        print(f"フォルダ内にGBDファイルが見つかりません: {date_path}")
+        return None
+    
+    # 最新のファイルを取得（ファイル名の日時でソート）
+    latest_file = sorted(gbd_files)[-1]
+    latest_path = os.path.join(date_path, latest_file)
+    
+    print(f"最新のGBDファイルを開きます: {latest_file}")
+    return latest_path
+
+# 初期のGBDパスを設定
+gbd_path = get_gbd_path()
 
 def read_gbd_file(file_path):
+    if file_path is None:
+        print("GBDファイルが見つかりません。新しいファイルを作成します。")
+        return pd.DataFrame()  # 空のDataFrameを返す
+    
     header_size = 9216
     record_size = 12 * 2
 
