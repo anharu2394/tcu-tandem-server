@@ -18,10 +18,10 @@ key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt2
 supabase: Client = create_client(url, key)
 
 # gRPC setup
-grpc_address = "127.0.0.1:8080"
+grpc_address = "tandem-grpc-server-hipd7dwdba-an.a.run.app:443"
 
 # GBD path
-gbd_path = '../gbd/GL240 01 Mar 26 2025.gbd'
+gbd_path = r"C:\\Users\\TCU-Tandem\\Documents\\graphtec\\GL100_240_840-APS\\Data\\2024-12-10\\2025-05-20\\GL240_01_2025-05-20_11-56-13.gbd"
 
 def read_gbd_file(file_path):
     header_size = 9216
@@ -62,7 +62,7 @@ async def send_to_grpc():
     while True:  # 永続的な接続を維持
         try:
             async with grpc.aio.secure_channel(
-                "tandem-grpc-server-hipd7dwdba-an.a.run.app:443",
+                grpc_address,
                 credentials
             ) as channel:
                 stub = tandem_pb2_grpc.TandemServiceStub(channel)
@@ -110,16 +110,16 @@ async def send_to_grpc():
                         tandem_data = tandem_pb2.TandemData(
                             id=str(uuid.uuid4()),
                             timestamp=timestamp_proto,
-                            beam_current_in=latest_row["入射ファラデ電流"],
-                            beam_current_out=latest_row["加速後の電流"],
-                            charge_current=latest_row["Charge Current"],
-                            gvm=str(latest_row["GVM"]),
-                            charge_power_supply=latest_row["Charge Power Supply"],
-                            le=latest_row["LE"],
-                            he=latest_row["HE"],
-                            cpo=latest_row["C.P.O"],
-                            probe_current=latest_row["プローブカレント"],
-                            probe_position=latest_row["プローブポジション"],
+                            beam_current_in=latest_row["入射ファラデ電流"]*10,
+                            beam_current_out=latest_row["加速後の電流"]*10,
+                            charge_current=latest_row["Charge Current"]*10,
+                            gvm=str(latest_row["GVM"]/3.9),
+                            charge_power_supply=latest_row["Charge Power Supply"]*10,
+                            le=latest_row["LE"]*10,
+                            he=latest_row["HE"]*10,
+                            cpo=latest_row["C.P.O"]*10,
+                            probe_current=latest_row["プローブカレント"]*10,
+                            probe_position=latest_row["プローブポジション"]*100,
                             experiment_id="",
                             transmission_ratio=latest_row["加速後の電流"] / latest_row["入射ファラデ電流"] if latest_row["入射ファラデ電流"] != 0 else 0,
                             transmission_slope=transmission_slope,
@@ -135,7 +135,34 @@ async def send_to_grpc():
                             stability_score=stability_score
                         )
 
-                        print("送信データ:", tandem_data)
+                        print("\n=== タンデム加速器データ ===")
+                        print(f"時刻: {timestamp.strftime('%Y-%m-%d %H:%M:%S')}")
+                        print("\n【基本測定値】")
+                        print(f"入射FC電流: {tandem_data.beam_current_in:.3f} [nA]")
+                        print(f"加速後の電流0度: {tandem_data.beam_current_out:.6f} [μA]")
+                        print(f"チャージング電流: {tandem_data.charge_current:.3f} [μA]")
+                        print(f"ターミナル電圧GVM: {float(tandem_data.gvm):.3f} [MV]")
+                        print(f"チャージングCPS: {tandem_data.charge_power_supply:.3f} [kV]")
+                        print(f"LE: {tandem_data.le:.3f} [μA]")
+                        print(f"HE: {tandem_data.he:.3f} [μA]")
+                        print(f"C.P.O: {tandem_data.cpo:.5f} [V]")
+                        print(f"プローブ電流: {tandem_data.probe_current:.3f} [μA]")
+                        print(f"プローブ位置: {tandem_data.probe_position:.3f} [mm]")
+
+                        print("\n【計算指標】")
+                        print(f"透過率: {tandem_data.transmission_ratio:.3f}")
+                        print(f"透過率の傾き: {transmission_slope:.6f}")
+                        print(f"透過率の分散: {transmission_variance:.6f}")
+                        print(f"ビーム損失比: {tandem_data.beam_loss_ratio:.3f}")
+                        print(f"GVM-チャージ電源の傾き: {gvm_charge_slope:.6f}")
+                        print(f"GVM-チャージ電源の分散: {gvm_charge_variance:.6f}")
+                        print(f"GVM-チャージ電源の相関: {gvm_charge_correlation:.3f}")
+                        print(f"チャージ電流の傾き: {charge_current_slope:.6f}")
+                        print(f"チャージ電流の分散: {charge_current_variance:.6f}")
+                        print(f"GVMの傾き: {gvm_slope:.6f}")
+                        print(f"GVMの分散: {gvm_variance:.6f}")
+                        print(f"安定性スコア: {stability_score:.3f}")
+                        print("=" * 30)
                         
                         # 同じストリームにデータを送信
                         await stream.write(tandem_data)
