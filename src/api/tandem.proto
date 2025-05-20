@@ -7,24 +7,49 @@ import "google/protobuf/timestamp.proto";
 
 package tandem;
 
+// Tandem データの送受信サービス
 service TandemService {
+  // データ取得（サーバーからクライアントへストリーム）
   rpc GetData(google.protobuf.Empty) returns (stream TandemData);
+  // データ送信（クライアントからサーバーへストリーム）
   rpc SendData(stream TandemData) returns (google.protobuf.Empty);
 }
 
+// 1件のタンデム加速器データを表すメッセージ
 message TandemData {
-  string id = 1;
-  google.protobuf.Timestamp timestamp = 2;
-  double beam_current_in = 3;
-  double beam_current_out = 4;
-  double charge_current = 5;
-  string gvm = 6;
-  double charge_power_supply = 7;
-  double le = 8;
-  double he = 9;
-  double cpo = 10;
-  double probe_current = 11;
-  double probe_position = 12;
-  string experiment_id = 13; // optional
-  
+  // --- 基本情報 ---
+  string id = 1;                                  // 一意のID
+  google.protobuf.Timestamp timestamp = 2;        // タイムスタンプ（UTC）
+
+  // --- 元データ（実測値） ---
+  double beam_current_in = 3;                     // 入射ファラデー電流
+  double beam_current_out = 4;                    // 加速後の電流
+  double charge_current = 5;                      // チャージ電流
+  string gvm = 6;                                  // GVM（Gate Valve Monitor）電圧
+  double charge_power_supply = 7;                 // チャージ電源
+  double le = 8;                                   // Low Energy 側の電圧
+  double he = 9;                                   // High Energy 側の電圧
+  double cpo = 10;                                 // C.P.O（不明な略称、仕様に準ずる）
+  double probe_current = 11;                      // プローブ電流
+  double probe_position = 12;                     // プローブ位置
+  string experiment_id = 13;                      // 実験ID（任意）
+
+  // --- 拡張指標（分析・評価値） ---
+  double transmission_ratio = 14;                 // 透過率（加速後 / 入射）
+  double transmission_slope = 15;                 // 透過率の傾き（100点より回帰）
+  double transmission_variance = 16;              // 透過率の分散
+
+  double beam_loss_ratio = 17;                    // HE / LE（ビーム損失係数）
+
+  double gvm_charge_slope = 18;                   // GVMとチャージ電源の連動性の傾き
+  double gvm_charge_variance = 19;                // GVMとチャージ電源の連動性の分散
+  double gvm_charge_correlation = 20;             // GVMとチャージ電源の相関係数（またはスコア）
+
+  double charge_current_slope = 21;               // チャージ電流の傾き
+  double charge_current_variance = 22;            // チャージ電流の分散
+
+  double gvm_slope = 23;                          // GVMの傾き
+  double gvm_variance = 24;                       // GVMの分散
+
+  double stability_score = 25;                    // 総合安定性スコア（上記6指標の平均）
 }

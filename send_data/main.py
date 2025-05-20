@@ -2,7 +2,7 @@ import pandas as pd
 import time
 import asyncio
 import os
-from datetime import datetime, timedelta
+from datetime import datetime
 from supabase import create_client, Client
 import tandem_pb2
 import tandem_pb2_grpc
@@ -36,117 +36,134 @@ def read_gbd_file(file_path):
 
     raw_data = np.frombuffer(data_bytes, dtype='>i2')
     data = raw_data.reshape((num_records, 12))
-    analog_data_raw = data[:, :10]
-    analog_data = analog_data_raw / 200.0
+    analog_data_raw = data[:, :10] / 200.0
 
     time_sec = np.arange(num_records) * 0.1
-    channel_names = [
-        "入射ファラデ電流",
-        "加速後の電流",
-        "Charge Current",
-        "GVM",
-        "Charge Power Supply",
-        "LE",
-        "HE",
-        "C.P.O",
-        "プローブカレント",
-        "プローブポジション"
+    columns = [
+        "入射ファラデ電流", "加速後の電流", "Charge Current", "GVM", "Charge Power Supply",
+        "LE", "HE", "C.P.O", "プローブカレント", "プローブポジション"
     ]
-    df = pd.DataFrame(analog_data, columns=channel_names)
+    df = pd.DataFrame(analog_data_raw, columns=columns)
     df.insert(0, "Time(s)", time_sec)
     return df
 
-def process_gbd():
-    df = read_gbd_file(gbd_path)
-    total_rows = len(df)
-    print("GBDファイルの総行数:", total_rows)
-    print("最新の20行を返します")
-    return total_rows, df.iloc[-20:]
+def calc_slope_variance(series):
+    x = np.arange(len(series))
+    y = series.values
+    slope = np.polyfit(x, y, 1)[0] if len(series) > 1 else 0.0
+    variance = float(np.var(y))
+    return slope, variance
 
-async def send_to_grpc_forever():
+def calc_stability_score(*metrics):
+    return float(np.mean(metrics))
+
+async def send_to_grpc():
     credentials = grpc.ssl_channel_credentials()
     async with grpc.aio.secure_channel(grpc_address, credentials) as channel:
         stub = tandem_pb2_grpc.TandemServiceStub(channel)
 
-        async def generate_requests():
-            last_row_count = 0
-            while True:
-                total_rows, df = process_gbd()
-
-                if total_rows > last_row_count:
-                    print(f"GBDファイルが更新されました。総行数: {total_rows} (前回: {last_row_count})")
-                    for _, row in df.iterrows():
-                        timestamp = datetime.utcnow()
-                        timestamp_proto = _timestamp_pb2.Timestamp()
-                        timestamp_proto.FromDatetime(timestamp)
-
-                        beam_current_in = row["入射ファラデ電流"]
-                        beam_current_out = row["加速後の電流"]
-                        charge_current = row["Charge Current"]
-                        charge_power_supply = row["Charge Power Supply"]
-                        gvm_value = float(row["GVM"])
-                        le = row["LE"]
-                        he = row["HE"]
-
-                        tandem_data = tandem_pb2.TandemData(
-                            id=str(uuid.uuid4()),
-                            timestamp=timestamp_proto,
-                            beam_current_in=beam_current_in,
-                            beam_current_out=beam_current_out,
-                            charge_current=charge_current,
-                            gvm=str(gvm_value),
-                            charge_power_supply=charge_power_supply,
-                            le=le,
-                            he=he,
-                            cpo=row["C.P.O"],
-                            probe_current=row["プローブカレント"],
-                            probe_position=row["プローブポジション"],
-                            experiment_id="",
-
-                            # ダミー値または後で計算追加
-                            transmission_ratio=beam_current_out / beam_current_in if beam_current_in != 0 else 0,
-                            transmission_slope=0,
-                            transmission_variance=0,
-                            beam_loss_ratio=he / le if le != 0 else 0,
-                            gvm_charge_correlation=0,
-                            charge_current_slope=0,
-                            charge_current_variance=0,
-                            gvm_slope=0,
-                            gvm_variance=0,
-                            stability_score=0.0
-                        )
-
-                        print("送信データ:", tandem_data)
-                        yield tandem_data
-
-                        supabase.table("tandem_data").insert({
-                            "id": tandem_data.id,
-                            "timestamp": timestamp.isoformat(),
-                            "beam_current_in": beam_current_in,
-                            "beam_current_out": beam_current_out,
-                            "charge_current": charge_current,
-                            "gvm": str(gvm_value),
-                            "charge_power_supply": charge_power_supply,
-                            "le": le,
-                            "he": he,
-                            "cpo": tandem_data.cpo,
-                            "probe_current": tandem_data.probe_current,
-                            "probe_position": tandem_data.probe_position
-                        }).execute()
-
-                    last_row_count = total_rows
-                else:
-                    print(f"GBDファイルは更新されていません。現在の総行数: {total_rows}")
-
+        while True:
+            df = read_gbd_file(gbd_path)
+            if len(df) < 100:
                 await asyncio.sleep(1)
+                continue
 
-        try:
-            response = await stub.SendData(generate_requests())
-            print("gRPC応答:", response)
-        except grpc.aio.AioRpcError as e:
-            print(f"送信エラー: {e.code()} - {e.details()}")
-        except asyncio.CancelledError:
-            print("gRPCストリーム送信がCancelledErrorで中断されました。")
+            recent_df = df.iloc[-100:]
+            latest_row = recent_df.iloc[-1]
+
+            # 各指標計算
+            transmission = recent_df["加速後の電流"] / recent_df["入射ファラデ電流"].replace(0, np.nan)
+            transmission_slope, transmission_variance = calc_slope_variance(transmission.fillna(0))
+
+            charge_current_slope, charge_current_variance = calc_slope_variance(recent_df["Charge Current"])
+            gvm_float_series = recent_df["GVM"].astype(float)
+            gvm_slope, gvm_variance = calc_slope_variance(gvm_float_series)
+
+            charge_supply_series = recent_df["Charge Power Supply"]
+            gvm_charge_diff = gvm_float_series - charge_supply_series
+            gvm_charge_slope, gvm_charge_variance = calc_slope_variance(gvm_charge_diff)
+            gvm_charge_correlation = float(np.corrcoef(gvm_float_series, charge_supply_series)[0, 1]) if len(gvm_float_series) > 1 else 0
+
+            stability_score = calc_stability_score(
+                transmission_slope,
+                transmission_variance,
+                charge_current_slope,
+                charge_current_variance,
+                gvm_slope,
+                gvm_variance
+            )
+
+            timestamp = datetime.utcnow()
+            timestamp_proto = _timestamp_pb2.Timestamp()
+            timestamp_proto.FromDatetime(timestamp)
+
+            tandem_data = tandem_pb2.TandemData(
+                id=str(uuid.uuid4()),
+                timestamp=timestamp_proto,
+                beam_current_in=latest_row["入射ファラデ電流"],
+                beam_current_out=latest_row["加速後の電流"],
+                charge_current=latest_row["Charge Current"],
+                gvm=str(latest_row["GVM"]),
+                charge_power_supply=latest_row["Charge Power Supply"],
+                le=latest_row["LE"],
+                he=latest_row["HE"],
+                cpo=latest_row["C.P.O"],
+                probe_current=latest_row["プローブカレント"],
+                probe_position=latest_row["プローブポジション"],
+                experiment_id="",
+                transmission_ratio=latest_row["加速後の電流"] / latest_row["入射ファラデ電流"] if latest_row["入射ファラデ電流"] != 0 else 0,
+                transmission_slope=transmission_slope,
+                transmission_variance=transmission_variance,
+                beam_loss_ratio=latest_row["HE"] / latest_row["LE"] if latest_row["LE"] != 0 else 0,
+                gvm_charge_slope=gvm_charge_slope,
+                gvm_charge_variance=gvm_charge_variance,
+                gvm_charge_correlation=gvm_charge_correlation,
+                charge_current_slope=charge_current_slope,
+                charge_current_variance=charge_current_variance,
+                gvm_slope=gvm_slope,
+                gvm_variance=gvm_variance,
+                stability_score=stability_score
+            )
+
+            print("送信データ:", tandem_data)
+            try:
+                await stub.SendData(iter([tandem_data]))
+            except grpc.aio.AioRpcError as e:
+                print(f"送信エラー: {e.code()} - {e.details()}")
+
+            # Supabase送信（同じtimestampが登録済みならスキップ）
+            existing = supabase.table("tandem_data").select("id").eq("timestamp", timestamp.isoformat()).execute()
+            if not existing.data:
+                supabase.table("tandem_data").insert({
+                    "id": tandem_data.id,
+                    "timestamp": timestamp.isoformat(),
+                    "beam_current_in": tandem_data.beam_current_in,
+                    "beam_current_out": tandem_data.beam_current_out,
+                    "charge_current": tandem_data.charge_current,
+                    "gvm": tandem_data.gvm,
+                    "charge_power_supply": tandem_data.charge_power_supply,
+                    "le": tandem_data.le,
+                    "he": tandem_data.he,
+                    "cpo": tandem_data.cpo,
+                    "probe_current": tandem_data.probe_current,
+                    "probe_position": tandem_data.probe_position,
+                    "transmission_ratio": tandem_data.transmission_ratio,
+                    "transmission_slope": tandem_data.transmission_slope,
+                    "transmission_variance": tandem_data.transmission_variance,
+                    "beam_loss_ratio": tandem_data.beam_loss_ratio,
+                    "gvm_charge_slope": tandem_data.gvm_charge_slope,
+                    "gvm_charge_variance": tandem_data.gvm_charge_variance,
+                    "gvm_charge_correlation": tandem_data.gvm_charge_correlation,
+                    "charge_current_slope": tandem_data.charge_current_slope,
+                    "charge_current_variance": tandem_data.charge_current_variance,
+                    "gvm_slope": tandem_data.gvm_slope,
+                    "gvm_variance": tandem_data.gvm_variance,
+                    "stability_score": tandem_data.stability_score
+                }).execute()
+            else:
+                print("⚠️ Supabase: 同じtimestampのデータが既に存在するためスキップされました。")
+
+            await asyncio.sleep(1)
 
 if __name__ == '__main__':
-    asyncio.run(send_to_grpc_forever())
+    asyncio.run(send_to_grpc())

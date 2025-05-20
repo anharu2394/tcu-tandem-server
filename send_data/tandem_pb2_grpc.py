@@ -27,7 +27,8 @@ if _version_not_supported:
 
 
 class TandemServiceStub(object):
-    """Missing associated documentation comment in .proto file."""
+    """Tandem データの送受信サービス
+    """
 
     def __init__(self, channel):
         """Constructor.
@@ -48,16 +49,19 @@ class TandemServiceStub(object):
 
 
 class TandemServiceServicer(object):
-    """Missing associated documentation comment in .proto file."""
+    """Tandem データの送受信サービス
+    """
 
     def GetData(self, request, context):
-        """Missing associated documentation comment in .proto file."""
+        """データ取得（サーバーからクライアントへストリーム）
+        """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
     def SendData(self, request_iterator, context):
-        """Missing associated documentation comment in .proto file."""
+        """データ送信（クライアントからサーバーへストリーム）
+        """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
@@ -84,7 +88,8 @@ def add_TandemServiceServicer_to_server(servicer, server):
 
  # This class is part of an EXPERIMENTAL API.
 class TandemService(object):
-    """Missing associated documentation comment in .proto file."""
+    """Tandem データの送受信サービス
+    """
 
     @staticmethod
     def GetData(request,
