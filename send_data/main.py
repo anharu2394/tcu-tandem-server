@@ -95,8 +95,155 @@ def calc_slope_variance(series):
     variance = float(np.var(y))
     return slope, variance
 
-def calc_stability_score(*metrics):
-    return float(np.mean(metrics))
+def calc_score1(gvm_variance, gvm_slope):
+    # GVM分散の評価（10点満点）
+    if gvm_variance <= 0.0001:
+        variance_score = 10
+    elif gvm_variance <= 0.0002:
+        variance_score = 8
+    elif gvm_variance <= 0.0004:
+        variance_score = 7
+    elif gvm_variance <= 0.0005:
+        variance_score = 6
+    elif gvm_variance <= 0.001:
+        variance_score = 4
+    else:
+        variance_score = 0
+
+    # GVM傾きの評価（10点満点）
+    if gvm_slope <= 0.001:
+        slope_score = 10
+    elif gvm_slope <= 0.002:
+        slope_score = 8
+    elif gvm_slope <= 0.003:
+        slope_score = 6
+    elif gvm_slope <= 0.004:
+        slope_score = 4
+    elif gvm_slope <= 0.005:
+        slope_score = 2
+    else:
+        slope_score = 0
+
+    return variance_score + slope_score
+
+def calc_score2(gvm_charge_variance, gvm_charge_slope):
+    # GVMとCPSの比の分散の評価（10点満点）
+    if gvm_charge_variance <= 0.0001:
+        variance_score = 10
+    elif gvm_charge_variance <= 0.00015:
+        variance_score = 8
+    elif gvm_charge_variance <= 0.0002:
+        variance_score = 6
+    elif gvm_charge_variance <= 0.0003:
+        variance_score = 4
+    elif gvm_charge_variance <= 0.0004:
+        variance_score = 2
+    else:
+        variance_score = 0
+
+    # GVMとCPSの比の傾きの評価（10点満点）
+    if gvm_charge_slope <= 0.0005:
+        slope_score = 10
+    elif gvm_charge_slope <= 0.001:
+        slope_score = 8
+    elif gvm_charge_slope <= 0.002:
+        slope_score = 6
+    elif gvm_charge_slope <= 0.003:
+        slope_score = 4
+    elif gvm_charge_slope <= 0.004:
+        slope_score = 2
+    else:
+        slope_score = 0
+
+    return variance_score + slope_score
+
+def calc_score3(le_he_difference):
+    # LE-HEの評価（20点満点）
+    if le_he_difference >= -0.035:
+        return 20
+    elif le_he_difference >= -0.04:
+        return 18
+    elif le_he_difference >= -0.05:
+        return 16
+    elif le_he_difference >= -0.06:
+        return 14
+    elif le_he_difference >= -0.07:
+        return 12
+    elif le_he_difference >= -0.1:
+        return 10
+    elif le_he_difference >= -0.15:
+        return 8
+    elif le_he_difference >= -0.2:
+        return 6
+    elif le_he_difference >= -0.25:
+        return 4
+    else:
+        return 0
+
+def calc_score4(probe_current_variance, probe_current_slope):
+    # プローブカレントの分散の評価（10点満点）
+    if probe_current_variance <= 0.00001:
+        variance_score = 10
+    elif probe_current_variance <= 0.00002:
+        variance_score = 8
+    elif probe_current_variance <= 0.00003:
+        variance_score = 6
+    elif probe_current_variance <= 0.0001:
+        variance_score = 4
+    elif probe_current_variance <= 0.0002:
+        variance_score = 2
+    else:
+        variance_score = 0
+
+    # プローブカレントの傾きの評価（10点満点）
+    if probe_current_slope <= 0.0001:
+        slope_score = 10
+    elif probe_current_slope <= 0.00015:
+        slope_score = 8
+    elif probe_current_slope <= 0.0002:
+        slope_score = 6
+    elif probe_current_slope <= 0.0003:
+        slope_score = 4
+    elif probe_current_slope <= 0.0004:
+        slope_score = 2
+    else:
+        slope_score = 0
+
+    return variance_score + slope_score
+
+def calc_score5(charge_current_variance, charge_current_slope):
+    # チャージカレントの分散の評価（10点満点）
+    if charge_current_variance <= 0.00001:
+        variance_score = 10
+    elif charge_current_variance <= 0.00002:
+        variance_score = 8
+    elif charge_current_variance <= 0.00003:
+        variance_score = 6
+    elif charge_current_variance <= 0.0001:
+        variance_score = 4
+    elif charge_current_variance <= 0.0002:
+        variance_score = 2
+    else:
+        variance_score = 0
+
+    # チャージカレントの傾きの評価（10点満点）
+    if charge_current_slope <= 0.0005:
+        slope_score = 10
+    elif charge_current_slope <= 0.001:
+        slope_score = 8
+    elif charge_current_slope <= 0.002:
+        slope_score = 6
+    elif charge_current_slope <= 0.003:
+        slope_score = 4
+    elif charge_current_slope <= 0.004:
+        slope_score = 2
+    else:
+        slope_score = 0
+
+    return variance_score + slope_score
+
+def calc_stability_score(score1, score2, score3, score4, score5):
+    return score1 + score2 + score3 + score4 + score5
 
 async def generate_tandem_data():
     while True:
@@ -126,21 +273,14 @@ async def generate_tandem_data():
             probe_current_slope, probe_current_variance = calc_slope_variance(recent_df["プローブカレント"])
             le_he_difference = latest_row["LE"] - latest_row["HE"]
 
-            # スコアの計算（例として、既存の指標を基に計算）
-            score_1 = float(np.mean([transmission_slope, charge_current_slope, gvm_slope]))
-            score_2 = float(np.mean([transmission_variance, charge_current_variance, gvm_variance]))
-            score_3 = float(np.mean([gvm_charge_correlation, transmission_ratio]))
-            score_4 = float(np.mean([probe_current_slope, probe_current_variance]))
-            score_5 = float(np.mean([le_he_difference, beam_loss_ratio]))
+            # スコアの計算
+            score_1 = calc_score1(gvm_variance, gvm_slope)
+            score_2 = calc_score2(gvm_charge_variance, gvm_charge_slope)
+            score_3 = calc_score3(le_he_difference)
+            score_4 = calc_score4(probe_current_variance, probe_current_slope)
+            score_5 = calc_score5(charge_current_variance, charge_current_slope)
 
-            stability_score = calc_stability_score(
-                transmission_slope,
-                transmission_variance,
-                charge_current_slope,
-                charge_current_variance,
-                gvm_slope,
-                gvm_variance
-            )
+            stability_score = calc_stability_score(score_1, score_2, score_3, score_4, score_5)
 
             # UTCタイムゾーンを使用
             timestamp = datetime.now(timezone.utc)
@@ -212,12 +352,12 @@ async def generate_tandem_data():
             print(f"LE-HE差: {le_he_difference:.3f}")
             print(f"プローブ電流の傾き: {probe_current_slope:.6f}")
             print(f"プローブ電流の分散: {probe_current_variance:.6f}")
-            print(f"スコア1: {score_1:.3f}")
-            print(f"スコア2: {score_2:.3f}")
-            print(f"スコア3: {score_3:.3f}")
-            print(f"スコア4: {score_4:.3f}")
-            print(f"スコア5: {score_5:.3f}")
-            print(f"安定性スコア: {stability_score:.3f}")
+            print(f"スコア1: {score_1:.3f} (GVMの安定性評価: 分散と傾きの合計)")
+            print(f"スコア2: {score_2:.3f} (GVMとCPSの関係性評価: 分散と傾きの合計)")
+            print(f"スコア3: {score_3:.3f} (LE-HE差の評価)")
+            print(f"スコア4: {score_4:.3f} (プローブカレントの安定性評価: 分散と傾きの合計)")
+            print(f"スコア5: {score_5:.3f} (チャージカレントの安定性評価: 分散と傾きの合計)")
+            print(f"安定性スコア: {stability_score:.3f} (全スコアの合計、最大100点)")
             print("=" * 30)
 
             # Supabase送信（同じtimestampが登録済みならスキップ）
