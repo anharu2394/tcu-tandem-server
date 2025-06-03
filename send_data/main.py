@@ -213,15 +213,15 @@ def calc_score4(probe_current_variance, probe_current_slope):
 
 def calc_score5(charge_current_variance, charge_current_slope):
     # チャージカレントの分散の評価（10点満点）
-    if charge_current_variance <= 0.00001:
+    if charge_current_variance <= 0.0004:
         variance_score = 10
-    elif charge_current_variance <= 0.00002:
+    elif charge_current_variance <= 0.0005:
         variance_score = 8
-    elif charge_current_variance <= 0.00003:
+    elif charge_current_variance <= 0.0006:
         variance_score = 6
-    elif charge_current_variance <= 0.0001:
+    elif charge_current_variance <= 0.0007:
         variance_score = 4
-    elif charge_current_variance <= 0.0002:
+    elif charge_current_variance <= 0.0008:
         variance_score = 2
     else:
         variance_score = 0

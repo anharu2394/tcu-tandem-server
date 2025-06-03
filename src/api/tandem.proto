@@ -25,7 +25,7 @@ message TandemData {
   double beam_current_in = 3;                     // 入射ファラデー電流
   double beam_current_out = 4;                    // 加速後の電流
   double charge_current = 5;                      // チャージ電流
-  string gvm = 6;                                  // GVM（Gate Valve Monitor）電圧
+  double gvm = 6;                                  // GVM（Gate Valve Monitor）電圧
   double charge_power_supply = 7;                 // チャージ電源
   double le = 8;                                   // Low Energy 側の電圧
   double he = 9;                                   // High Energy 側の電圧
