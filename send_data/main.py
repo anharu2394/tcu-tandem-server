@@ -2,7 +2,7 @@ import pandas as pd
 import time
 import asyncio
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from supabase import create_client, Client
 import tandem_pb2
 import tandem_pb2_grpc
@@ -11,11 +11,19 @@ from google.protobuf import timestamp_pb2 as _timestamp_pb2
 import uuid
 import numpy as np
 import struct
+import socket
 
 # Supabase setup
 url = "https://kvsqxjeanrpifkcyvqkt.supabase.co"
 key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt2c3F4amVhbnJwaWZrY3l2cWt0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc2MzM0MDEsImV4cCI6MjA2MzIwOTQwMX0.5ah2atIUwHRoYh0xocXb-7FhSYeRVe_bLbGbGe46-08"
-supabase: Client = create_client(url, key)
+
+try:
+    supabase: Client = create_client(url, key)
+    print("Supabase接続を開始します")
+except Exception as e:
+    print(f"Supabase接続エラー: {e}")
+    print("Supabaseへの接続に失敗しました。データベースへの保存はスキップされます。")
+    supabase = None
 
 # gRPC setup
 grpc_address = "tandem-grpc-server-hipd7dwdba-an.a.run.app:443"
@@ -46,7 +54,7 @@ def get_gbd_path():
     latest_file = sorted(gbd_files)[-1]
     latest_path = os.path.join(date_path, latest_file)
     
-    print(f"最新のGBDファイルを開きます: {latest_file}")
+    print(f"最新のGBDファイルを開きます: {latest_path}")
     return latest_path
 
 # 初期のGBDパスを設定
@@ -114,6 +122,17 @@ async def generate_tandem_data():
             gvm_charge_slope, gvm_charge_variance = calc_slope_variance(gvm_charge_diff)
             gvm_charge_correlation = float(np.corrcoef(gvm_float_series, charge_supply_series)[0, 1]) if len(gvm_float_series) > 1 else 0
 
+            # 新しい指標の計算
+            probe_current_slope, probe_current_variance = calc_slope_variance(recent_df["プローブカレント"])
+            le_he_difference = latest_row["LE"] - latest_row["HE"]
+
+            # スコアの計算（例として、既存の指標を基に計算）
+            score_1 = float(np.mean([transmission_slope, charge_current_slope, gvm_slope]))
+            score_2 = float(np.mean([transmission_variance, charge_current_variance, gvm_variance]))
+            score_3 = float(np.mean([gvm_charge_correlation, transmission_ratio]))
+            score_4 = float(np.mean([probe_current_slope, probe_current_variance]))
+            score_5 = float(np.mean([le_he_difference, beam_loss_ratio]))
+
             stability_score = calc_stability_score(
                 transmission_slope,
                 transmission_variance,
@@ -123,7 +142,8 @@ async def generate_tandem_data():
                 gvm_variance
             )
 
-            timestamp = datetime.utcnow()
+            # UTCタイムゾーンを使用
+            timestamp = datetime.now(timezone.utc)
             timestamp_proto = _timestamp_pb2.Timestamp()
             timestamp_proto.FromDatetime(timestamp)
 
@@ -152,6 +172,14 @@ async def generate_tandem_data():
                 charge_current_variance=charge_current_variance,
                 gvm_slope=gvm_slope,
                 gvm_variance=gvm_variance,
+                le_he_difference=le_he_difference,
+                probe_current_slope=probe_current_slope,
+                probe_current_variance=probe_current_variance,
+                score_1=score_1,
+                score_2=score_2,
+                score_3=score_3,
+                score_4=score_4,
+                score_5=score_5,
                 stability_score=stability_score
             )
 
@@ -181,46 +209,72 @@ async def generate_tandem_data():
             print(f"チャージ電流の分散: {charge_current_variance:.6f}")
             print(f"GVMの傾き: {gvm_slope:.6f}")
             print(f"GVMの分散: {gvm_variance:.6f}")
+            print(f"LE-HE差: {le_he_difference:.3f}")
+            print(f"プローブ電流の傾き: {probe_current_slope:.6f}")
+            print(f"プローブ電流の分散: {probe_current_variance:.6f}")
+            print(f"スコア1: {score_1:.3f}")
+            print(f"スコア2: {score_2:.3f}")
+            print(f"スコア3: {score_3:.3f}")
+            print(f"スコア4: {score_4:.3f}")
+            print(f"スコア5: {score_5:.3f}")
             print(f"安定性スコア: {stability_score:.3f}")
             print("=" * 30)
 
             # Supabase送信（同じtimestampが登録済みならスキップ）
-            existing = supabase.table("tandem_data").select("id").eq("timestamp", timestamp.isoformat()).execute()
-            if not existing.data:
-                supabase.table("tandem_data").insert({
-                    "id": tandem_data.id,
-                    "timestamp": timestamp.isoformat(),
-                    "beam_current_in": tandem_data.beam_current_in,
-                    "beam_current_out": tandem_data.beam_current_out,
-                    "charge_current": tandem_data.charge_current,
-                    "gvm": tandem_data.gvm,
-                    "charge_power_supply": tandem_data.charge_power_supply,
-                    "le": tandem_data.le,
-                    "he": tandem_data.he,
-                    "cpo": tandem_data.cpo,
-                    "probe_current": tandem_data.probe_current,
-                    "probe_position": tandem_data.probe_position,
-                    "transmission_ratio": tandem_data.transmission_ratio,
-                    "transmission_slope": tandem_data.transmission_slope,
-                    "transmission_variance": tandem_data.transmission_variance,
-                    "beam_loss_ratio": tandem_data.beam_loss_ratio,
-                    "gvm_charge_slope": tandem_data.gvm_charge_slope,
-                    "gvm_charge_variance": tandem_data.gvm_charge_variance,
-                    "gvm_charge_correlation": tandem_data.gvm_charge_correlation,
-                    "charge_current_slope": tandem_data.charge_current_slope,
-                    "charge_current_variance": tandem_data.charge_current_variance,
-                    "gvm_slope": tandem_data.gvm_slope,
-                    "gvm_variance": tandem_data.gvm_variance,
-                    "stability_score": tandem_data.stability_score
-                }).execute()
+            if supabase is not None:
+                try:
+                    existing = supabase.table("tandem_data").select("id").eq("timestamp", timestamp.isoformat()).execute()
+                    if not existing.data:
+                        supabase.table("tandem_data").insert({
+                            "id": tandem_data.id,
+                            "timestamp": timestamp.isoformat(),
+                            "beam_current_in": tandem_data.beam_current_in,
+                            "beam_current_out": tandem_data.beam_current_out,
+                            "charge_current": tandem_data.charge_current,
+                            "gvm": tandem_data.gvm,
+                            "charge_power_supply": tandem_data.charge_power_supply,
+                            "le": tandem_data.le,
+                            "he": tandem_data.he,
+                            "cpo": tandem_data.cpo,
+                            "probe_current": tandem_data.probe_current,
+                            "probe_position": tandem_data.probe_position,
+                            "transmission_ratio": tandem_data.transmission_ratio,
+                            "transmission_slope": tandem_data.transmission_slope,
+                            "transmission_variance": tandem_data.transmission_variance,
+                            "beam_loss_ratio": tandem_data.beam_loss_ratio,
+                            "gvm_charge_slope": tandem_data.gvm_charge_slope,
+                            "gvm_charge_variance": tandem_data.gvm_charge_variance,
+                            "gvm_charge_correlation": tandem_data.gvm_charge_correlation,
+                            "charge_current_slope": tandem_data.charge_current_slope,
+                            "charge_current_variance": tandem_data.charge_current_variance,
+                            "gvm_slope": tandem_data.gvm_slope,
+                            "gvm_variance": tandem_data.gvm_variance,
+                            "le_he_difference": tandem_data.le_he_difference,
+                            "probe_current_slope": tandem_data.probe_current_slope,
+                            "probe_current_variance": tandem_data.probe_current_variance,
+                            "score_1": tandem_data.score_1,
+                            "score_2": tandem_data.score_2,
+                            "score_3": tandem_data.score_3,
+                            "score_4": tandem_data.score_4,
+                            "score_5": tandem_data.score_5,
+                            "stability_score": tandem_data.stability_score
+                        }).execute()
+                    else:
+                        print("⚠️ Supabase: 同じtimestampのデータが既に存在するためスキップされました。")
+                except Exception as e:
+                    print(f"Supabaseデータ保存エラー: {e}")
+                    print("データベースへの保存をスキップします。")
             else:
-                print("⚠️ Supabase: 同じtimestampのデータが既に存在するためスキップされました。")
+                print("⚠️ Supabase: 接続が確立されていないため、データベースへの保存はスキップされます。")
 
             yield tandem_data
             await asyncio.sleep(1)
 
         except Exception as e:
             print(f"データ生成エラー: {e}")
+            import traceback
+            print("スタックトレース:")
+            traceback.print_exc()
             await asyncio.sleep(1)
             continue
 
@@ -246,7 +300,7 @@ async def send_to_grpc():
         except Exception as e:
             print(f"gRPC接続エラー: {e}")
             print("5秒後に再接続を試みます...")
-            await asyncio.sleep(5)  # エラー時に5秒待機して再接続
+            await asyncio.sleep(5)
 
 if __name__ == '__main__':
     asyncio.run(send_to_grpc())
