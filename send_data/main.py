@@ -293,7 +293,7 @@ async def generate_tandem_data():
                 beam_current_in=latest_row["入射ファラデ電流"]*10,
                 beam_current_out=latest_row["加速後の電流"]*10,
                 charge_current=latest_row["Charge Current"]*10,
-                gvm=str(latest_row["GVM"]/3.9),
+                gvm=latest_row["GVM"]/3.9,
                 charge_power_supply=latest_row["Charge Power Supply"]*10,
                 le=latest_row["LE"]*10,
                 he=latest_row["HE"]*10,
