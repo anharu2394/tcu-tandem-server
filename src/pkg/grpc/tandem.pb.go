@@ -53,6 +53,14 @@ type TandemData struct {
 	ChargeCurrentVariance float64 `protobuf:"fixed64,22,opt,name=charge_current_variance,json=chargeCurrentVariance,proto3" json:"charge_current_variance,omitempty"` // チャージ電流の分散
 	GvmSlope              float64 `protobuf:"fixed64,23,opt,name=gvm_slope,json=gvmSlope,proto3" json:"gvm_slope,omitempty"`                                          // GVMの傾き
 	GvmVariance           float64 `protobuf:"fixed64,24,opt,name=gvm_variance,json=gvmVariance,proto3" json:"gvm_variance,omitempty"`                                 // GVMの分散
+	LeHeDifference        float64 `protobuf:"fixed64,26,opt,name=le_he_difference,json=leHeDifference,proto3" json:"le_he_difference,omitempty"`                      // LEとHEの差分
+	ProbeCurrentSlope     float64 `protobuf:"fixed64,27,opt,name=probe_current_slope,json=probeCurrentSlope,proto3" json:"probe_current_slope,omitempty"`             // プローブ電流の傾き
+	ProbeCurrentVariance  float64 `protobuf:"fixed64,28,opt,name=probe_current_variance,json=probeCurrentVariance,proto3" json:"probe_current_variance,omitempty"`    // プローブ電流の分散
+	Score_1               float64 `protobuf:"fixed64,29,opt,name=score_1,json=score1,proto3" json:"score_1,omitempty"`                                                // 透過率に関する総合スコア
+	Score_2               float64 `protobuf:"fixed64,30,opt,name=score_2,json=score2,proto3" json:"score_2,omitempty"`                                                // ビーム損失に関する総合スコア
+	Score_3               float64 `protobuf:"fixed64,31,opt,name=score_3,json=score3,proto3" json:"score_3,omitempty"`                                                // GVM-チャージ電源連動性の総合スコア
+	Score_4               float64 `protobuf:"fixed64,32,opt,name=score_4,json=score4,proto3" json:"score_4,omitempty"`                                                // チャージ電流安定性の総合スコア
+	Score_5               float64 `protobuf:"fixed64,33,opt,name=score_5,json=score5,proto3" json:"score_5,omitempty"`                                                // GVM安定性の総合スコア
 	StabilityScore        float64 `protobuf:"fixed64,25,opt,name=stability_score,json=stabilityScore,proto3" json:"stability_score,omitempty"`                        // 総合安定性スコア（上記6指標の平均）
 	unknownFields         protoimpl.UnknownFields
 	sizeCache             protoimpl.SizeCache
@@ -256,6 +264,62 @@ func (x *TandemData) GetGvmVariance() float64 {
 	return 0
 }
 
+func (x *TandemData) GetLeHeDifference() float64 {
+	if x != nil {
+		return x.LeHeDifference
+	}
+	return 0
+}
+
+func (x *TandemData) GetProbeCurrentSlope() float64 {
+	if x != nil {
+		return x.ProbeCurrentSlope
+	}
+	return 0
+}
+
+func (x *TandemData) GetProbeCurrentVariance() float64 {
+	if x != nil {
+		return x.ProbeCurrentVariance
+	}
+	return 0
+}
+
+func (x *TandemData) GetScore_1() float64 {
+	if x != nil {
+		return x.Score_1
+	}
+	return 0
+}
+
+func (x *TandemData) GetScore_2() float64 {
+	if x != nil {
+		return x.Score_2
+	}
+	return 0
+}
+
+func (x *TandemData) GetScore_3() float64 {
+	if x != nil {
+		return x.Score_3
+	}
+	return 0
+}
+
+func (x *TandemData) GetScore_4() float64 {
+	if x != nil {
+		return x.Score_4
+	}
+	return 0
+}
+
+func (x *TandemData) GetScore_5() float64 {
+	if x != nil {
+		return x.Score_5
+	}
+	return 0
+}
+
 func (x *TandemData) GetStabilityScore() float64 {
 	if x != nil {
 		return x.StabilityScore
@@ -267,7 +331,7 @@ var File_tandem_proto protoreflect.FileDescriptor
 
 const file_tandem_proto_rawDesc = "" +
 	"\n" +
-	"\ftandem.proto\x12\x06tandem\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xd2\a\n" +
+	"\ftandem.proto\x12\x06tandem\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xdf\t\n" +
 	"\n" +
 	"TandemData\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x128\n" +
@@ -294,12 +358,19 @@ const file_tandem_proto_rawDesc = "" +
 	"\x14charge_current_slope\x18\x15 \x01(\x01R\x12chargeCurrentSlope\x126\n" +
 	"\x17charge_current_variance\x18\x16 \x01(\x01R\x15chargeCurrentVariance\x12\x1b\n" +
 	"\tgvm_slope\x18\x17 \x01(\x01R\bgvmSlope\x12!\n" +
-	"\fgvm_variance\x18\x18 \x01(\x01R\vgvmVariance\x12'\n" +
+	"\fgvm_variance\x18\x18 \x01(\x01R\vgvmVariance\x12(\n" +
+	"\x10le_he_difference\x18\x1a \x01(\x01R\x0eleHeDifference\x12.\n" +
+	"\x13probe_current_slope\x18\x1b \x01(\x01R\x11probeCurrentSlope\x124\n" +
+	"\x16probe_current_variance\x18\x1c \x01(\x01R\x14probeCurrentVariance\x12\x17\n" +
+	"\ascore_1\x18\x1d \x01(\x01R\x06score1\x12\x17\n" +
+	"\ascore_2\x18\x1e \x01(\x01R\x06score2\x12\x17\n" +
+	"\ascore_3\x18\x1f \x01(\x01R\x06score3\x12\x17\n" +
+	"\ascore_4\x18  \x01(\x01R\x06score4\x12\x17\n" +
+	"\ascore_5\x18! \x01(\x01R\x06score5\x12'\n" +
 	"\x0fstability_score\x18\x19 \x01(\x01R\x0estabilityScore2\x82\x01\n" +
 	"\rTandemService\x127\n" +
 	"\aGetData\x12\x16.google.protobuf.Empty\x1a\x12.tandem.TandemData0\x01\x128\n" +
-	"\bSendData\x12\x12.tandem.TandemData\x1a\x16.google.protobuf.Empty(\x01B\n" +
-	"Z\bpkg/grpcb\x06proto3"
+	"\bSendData\x12\x12.tandem.TandemData\x1a\x16.google.protobuf.Empty(\x01B\x1dZ\x1btandem-data-server/pkg/grpcb\x06proto3"
 
 var (
 	file_tandem_proto_rawDescOnce sync.Once

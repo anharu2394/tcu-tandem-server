@@ -51,5 +51,17 @@ message TandemData {
   double gvm_slope = 23;                          // GVMの傾き
   double gvm_variance = 24;                       // GVMの分散
 
+  double le_he_difference = 26;                   // LEとHEの差分
+
+  double probe_current_slope = 27;                // プローブ電流の傾き
+  double probe_current_variance = 28;             // プローブ電流の分散
+
+  double score_1 = 29;                           // 透過率に関する総合スコア
+  double score_2 = 30;                           // ビーム損失に関する総合スコア
+  double score_3 = 31;                           // GVM-チャージ電源連動性の総合スコア
+  double score_4 = 32;                           // チャージ電流安定性の総合スコア
+  double score_5 = 33;                           // GVM安定性の総合スコア
+
+
   double stability_score = 25;                    // 総合安定性スコア（上記6指標の平均）
 }
